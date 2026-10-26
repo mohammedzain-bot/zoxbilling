@@ -2,13 +2,24 @@ import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 import { fileURLToPath } from 'url';
+import { createClient } from '@supabase/supabase-js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOCAL_DB_PATH = path.join(__dirname, 'zox_store.json');
 const VERCEL_DB_PATH = path.join('/tmp', 'zox_store.json');
 const DB_PATH = process.env.VERCEL ? VERCEL_DB_PATH : LOCAL_DB_PATH;
 
+// Supabase Cloud Database Client (Optional, active when environment variables are set)
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
+
+export const supabase = (SUPABASE_URL && SUPABASE_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
+
 let dbMemory = null;
+let lastSyncTime = 0;
+const SYNC_INTERVAL_MS = 3000; // 3 seconds in-memory cache to minimize latency
 
 const DEFAULT_SETTINGS = {
   store_name: 'ZOX',
@@ -78,6 +89,40 @@ function initData() {
   };
 }
 
+export async function initOrSyncDb(force = false) {
+  const now = Date.now();
+  if (!force && dbMemory && (now - lastSyncTime < SYNC_INTERVAL_MS)) {
+    return dbMemory;
+  }
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('zox_store')
+        .select('data')
+        .eq('id', 'main')
+        .single();
+
+      if (data && data.data) {
+        dbMemory = data.data;
+        lastSyncTime = now;
+        return dbMemory;
+      } else if (error && (error.code === 'PGRST116' || error.message?.includes('0 rows'))) {
+        // Table exists but is empty; seed with clean data
+        const initial = initData();
+        await supabase.from('zox_store').upsert({ id: 'main', data: initial, updated_at: new Date().toISOString() });
+        dbMemory = initial;
+        lastSyncTime = now;
+        return dbMemory;
+      }
+    } catch (err) {
+      console.warn('Supabase sync warning, using local file cache:', err.message);
+    }
+  }
+
+  return getDb();
+}
+
 export function getDb() {
   if (dbMemory) return dbMemory;
 
@@ -97,12 +142,12 @@ export function getDb() {
       dbMemory = JSON.parse(raw);
       if (!dbMemory.settings) dbMemory.settings = DEFAULT_SETTINGS;
       if (!dbMemory.users) dbMemory.users = DEFAULT_USERS;
-      // Enforce the 4 requested categories in catalog
       dbMemory.catalog = DEFAULT_CATALOG;
       if (!dbMemory.customers) dbMemory.customers = [];
       if (!dbMemory.rentals) dbMemory.rentals = [];
       if (!dbMemory.sales) dbMemory.sales = [];
       if (!dbMemory.invoice_sequences) dbMemory.invoice_sequences = { rental: 0, sale: 0 };
+      lastSyncTime = Date.now();
       return dbMemory;
     } catch (e) {
       console.error('Error reading JSON db, re-initializing...', e);
@@ -111,18 +156,30 @@ export function getDb() {
 
   dbMemory = initData();
   saveDb(dbMemory);
+  lastSyncTime = Date.now();
   return dbMemory;
 }
 
-export function saveDb(data) {
+export async function saveDb(data) {
   try {
     dbMemory = data;
+    lastSyncTime = Date.now();
     fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
-    return true;
   } catch (err) {
-    console.error('Error saving DB:', err);
-    return false;
+    console.error('Error saving local DB:', err);
   }
+
+  if (supabase) {
+    try {
+      await supabase
+        .from('zox_store')
+        .upsert({ id: 'main', data, updated_at: new Date().toISOString() });
+    } catch (err) {
+      console.error('Error saving to Supabase:', err.message);
+    }
+  }
+
+  return true;
 }
 
 // Generate unique sequential invoice numbers

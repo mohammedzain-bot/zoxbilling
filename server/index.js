@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
-import { getDb } from './database.js';
+import { getDb, initOrSyncDb, supabase } from './database.js';
 import authRoutes from './routes/auth.js';
 import rentalsRoutes from './routes/rentals.js';
 import salesRoutes from './routes/sales.js';
@@ -26,6 +26,16 @@ app.use(express.json());
 // Initialize database
 getDb();
 
+// Database sync middleware (ensures data is fresh from Supabase if configured)
+app.use('/api', async (req, res, next) => {
+  try {
+    await initOrSyncDb();
+  } catch (err) {
+    console.error('Database sync error:', err);
+  }
+  next();
+});
+
 // Register API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/rentals', rentalsRoutes);
@@ -38,7 +48,12 @@ app.use('/api/settings', settingsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'ZOX Store Management API', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    service: 'ZOX Store Management API', 
+    database: supabase ? 'Supabase Cloud PostgreSQL' : 'Local Atomic JSON',
+    timestamp: new Date().toISOString() 
+  });
 });
 
 // Serve client build if available
