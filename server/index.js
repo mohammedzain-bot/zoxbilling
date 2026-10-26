@@ -51,6 +51,10 @@ if (fs.existsSync(clientDist)) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`ZOX Store Management Server running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`ZOX Store Management Server running on port ${PORT}`);
+  });
+}
+
+export default app;

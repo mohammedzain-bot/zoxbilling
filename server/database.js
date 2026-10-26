@@ -4,7 +4,9 @@ import bcrypt from 'bcryptjs';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, 'zox_store.json');
+const LOCAL_DB_PATH = path.join(__dirname, 'zox_store.json');
+const VERCEL_DB_PATH = path.join('/tmp', 'zox_store.json');
+const DB_PATH = process.env.VERCEL ? VERCEL_DB_PATH : LOCAL_DB_PATH;
 
 let dbMemory = null;
 
@@ -318,6 +320,16 @@ function initData() {
 
 export function getDb() {
   if (dbMemory) return dbMemory;
+
+  if (process.env.VERCEL && !fs.existsSync(VERCEL_DB_PATH)) {
+    try {
+      if (fs.existsSync(LOCAL_DB_PATH)) {
+        fs.copyFileSync(LOCAL_DB_PATH, VERCEL_DB_PATH);
+      }
+    } catch (e) {
+      console.warn('Could not copy seed DB to /tmp', e);
+    }
+  }
 
   if (fs.existsSync(DB_PATH)) {
     try {
