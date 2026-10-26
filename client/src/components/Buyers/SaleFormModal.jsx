@@ -21,16 +21,16 @@ export default function SaleFormModal({
   // Multi-item Line Items
   const [items, setItems] = useState([
     {
-      item_name: 'Obsidian Black Peak Tuxedo',
+      item_name: '',
       category: 'Suit',
       quantity: 1,
-      original_price: 12000,
-      offer_price: 9500
+      original_price: '',
+      offer_price: ''
     }
   ]);
 
   // Payment Details
-  const [amountPaid, setAmountPaid] = useState(9500);
+  const [amountPaid, setAmountPaid] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('UPI');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,8 +56,8 @@ export default function SaleFormModal({
         item_name: '',
         category: 'Suit',
         quantity: 1,
-        original_price: 5000,
-        offer_price: 4000
+        original_price: '',
+        offer_price: ''
       }
     ]);
   };

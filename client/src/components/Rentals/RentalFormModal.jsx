@@ -22,7 +22,7 @@ export default function RentalFormModal({
   const [itemName, setItemName] = useState('');
   const [itemCategory, setItemCategory] = useState('Suit');
   const [quantity, setQuantity] = useState(1);
-  const [rentalPrice, setRentalPrice] = useState(2500);
+  const [rentalPrice, setRentalPrice] = useState('');
   const [additionalCharges, setAdditionalCharges] = useState(0);
 
   // Rental Period state
@@ -34,7 +34,7 @@ export default function RentalFormModal({
   const [dateError, setDateError] = useState('');
 
   // Payment state
-  const [amountPaid, setAmountPaid] = useState(2500);
+  const [amountPaid, setAmountPaid] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('UPI');
   const [notes, setNotes] = useState('');
 
